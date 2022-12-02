@@ -1,5 +1,5 @@
 [package]
-name = "advent_of_code_2022"
+name = "aoc22"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
 colored = "2.0"
+strum = { version = "0.24", features = ["derive"] }

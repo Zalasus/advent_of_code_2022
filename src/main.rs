@@ -7,7 +7,7 @@ use clap::Parser;
 use colored::Colorize;
 
 
-const DAYS: usize = 1;
+const DAYS: usize = 2;
 
 
 /// Zalasus' advent of code 2022 entry.
@@ -16,6 +16,7 @@ struct Args {
     #[clap(short, long)]
     day: Option<usize>,
 
+    /// Enables interactive puzzles.
     #[clap(short, long)]
     interactive: bool,
 }
@@ -24,6 +25,7 @@ fn run_day(day: usize, _args: &Args) {
     println!("\n{} {}", "Running day".green().bold(), day);
     match day {
         1 => day1::run(),
+        2 => day2::run(),
         _ => eprintln!("{} {}", "Unknown day: ".red().bold(), day),
     }
 }
