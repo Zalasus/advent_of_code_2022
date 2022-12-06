@@ -5,6 +5,7 @@ pub mod day2;
 pub mod day3;
 pub mod day4;
 pub mod day5;
+pub mod day6;
 
 
 use clap::Parser;
@@ -12,7 +13,7 @@ use clap::Parser;
 use colored::Colorize;
 
 
-const DAYS: usize = 5;
+const DAYS: usize = 6;
 
 
 /// Zalasus' advent of code 2022 entry.
@@ -34,6 +35,7 @@ fn run_day(day: usize, _args: &Args) {
         3 => day3::run(),
         4 => day4::run(),
         5 => day5::run(),
+        6 => day6::run(),
         _ => eprintln!("{} {}", "Unknown day: ".red().bold(), day),
     }
 }

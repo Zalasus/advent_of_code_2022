@@ -9,3 +9,4 @@ edition = "2021"
 clap = { version = "4.0", features = ["derive"] }
 colored = "2.0"
 strum = { version = "0.24", features = ["derive"] }
+heapless = "0.7"
