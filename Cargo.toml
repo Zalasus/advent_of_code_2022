@@ -12,3 +12,4 @@ strum = { version = "0.24", features = ["derive"] }
 heapless = "0.7"
 petgraph = "0.6"
 ndarray = "0.15"
+cgmath = "0.18"
