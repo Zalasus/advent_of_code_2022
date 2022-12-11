@@ -35,11 +35,11 @@ impl FromStr for Instruction {
     type Err = InstructionParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut words = Words::new(s);
-        words.next_keyword("move")?;
+        words.expect_word("move")?;
         let count = words.next_parsed()?;
-        words.next_keyword("from")?;
+        words.expect_word("from")?;
         let from = words.next_parsed()?;
-        words.next_keyword("to")?;
+        words.expect_word("to")?;
         let to = words.next_parsed()?;
 
         if words.has_next() {
