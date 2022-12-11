@@ -62,25 +62,6 @@ pub enum WordsError<'a> {
 }
 
 
-/// Gets mutable references to two positions in a slice as long as they are distinct.
-///
-/// Not sure why this is not in the core library.
-pub fn get_two_mut<T>(slice: &mut [T], a: usize, b: usize) -> (&mut T, &mut T) {
-    use std::cmp::Ordering;
-    match a.cmp(&b) {
-        Ordering::Less => {
-            let (left, right) = slice.split_at_mut(b);
-            (&mut left[a], &mut right[0])
-        },
-        Ordering::Greater => {
-            let (left, right) = slice.split_at_mut(a);
-            (&mut right[0], &mut left[b])
-        },
-        Ordering::Equal => panic!("Non-unique indices"),
-    }
-}
-
-
 pub fn parse_separated_list<T: FromStr>(input: &str, separator: char) -> Result<Vec<T>, T::Err> {
     let items_estimate = input.chars().filter(|c| *c == separator).count() + 1;
     let mut list = Vec::with_capacity(items_estimate);

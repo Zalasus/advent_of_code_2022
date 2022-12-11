@@ -1,7 +1,7 @@
 
 //! This one's probably a bit overdone, but the most correct solution I could come up with.
 
-use crate::common::{Words, WordsError, get_two_mut};
+use crate::common::{Words, WordsError, GetMuts};
 
 use std::str::FromStr;
 
@@ -145,7 +145,8 @@ fn run_freightyard(input: &str, crane: CraneModel) -> String {
 
     for instruction in instructions {
         let count = instruction.count;
-        let (from, to) = get_two_mut(&mut stacks, instruction.from - 1, instruction.to - 1);
+
+        let [from, to] = stacks.get_muts([instruction.from - 1, instruction.to - 1]);
 
         let moved_stack = from.drain((from.len()-count)..);
 
