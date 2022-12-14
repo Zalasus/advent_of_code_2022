@@ -4,7 +4,7 @@ use crate::common::{parse_separated_list, GetMuts};
 use std::str::FromStr;
 
 
-type WorryLevel = i64;
+type WorryLevel = u64;
 
 
 #[derive(Debug)]
@@ -188,7 +188,10 @@ impl<'a> Monkey<'a> {
 }
 
 
-fn simulate_monkeys(monkeys: &mut [Monkey<'_>], rounds: usize, enable_relief: bool) {
+fn simulate_monkeys<F>(monkeys: &mut [Monkey<'_>], rounds: usize, mut relief_function: F)
+where
+    F: FnMut(WorryLevel) -> WorryLevel,
+{
     for _round in 0..rounds {
         for current_idx in 0..monkeys.len() {
             // borrow all thre monkeys involved
@@ -202,11 +205,7 @@ fn simulate_monkeys(monkeys: &mut [Monkey<'_>], rounds: usize, enable_relief: bo
 
             for item in current_monkey.items.drain(..) {
                 let inspected_item = current_monkey.def.operation.evaluate(item);
-                let tested_item = if enable_relief {
-                    inspected_item / 3
-                } else {
-                    inspected_item
-                };
+                let tested_item = relief_function(inspected_item);
 
                 if tested_item % current_monkey.def.divisible_test == 0 {
                     true_monkey.items.push(tested_item);
@@ -219,11 +218,33 @@ fn simulate_monkeys(monkeys: &mut [Monkey<'_>], rounds: usize, enable_relief: bo
 }
 
 
-fn top_most_active_monkeys(input: &[MonkeyDef], rounds: usize, enable_relief: bool) -> usize {
+fn top_most_active_monkeys<F>(input: &[MonkeyDef], rounds: usize, relief_function: F) -> usize
+where
+    F: FnMut(WorryLevel) -> WorryLevel,
+{
     let mut monkeys = input.iter().map(Monkey::new).collect::<Vec<_>>();
-    simulate_monkeys(&mut monkeys, rounds, enable_relief);
+    simulate_monkeys(&mut monkeys, rounds, relief_function);
     monkeys.sort_unstable_by_key(|m| m.inspected_item_count);
     monkeys.iter().rev().take(2).map(|m| m.inspected_item_count).product()
+}
+
+
+fn calc_part_one(input: &[MonkeyDef]) -> usize {
+    top_most_active_monkeys(input, 20, |worry| worry / 3)
+}
+
+fn calc_part_two(input: &[MonkeyDef]) -> usize {
+    // without dividing by three, worry levels exceed managable levels. however, for 0 ≤ i ≤ n:
+    //  a ≡ 0 mod m_i ⇔ a ≡ 0 mod lcm(m_0, .. m_n)
+    // (according to wikipedia) a set of divisibility rules still holds true if one replaces the
+    // moduli with their least common multiple. that is probably a wobbly definition and less than
+    // half of the proof needed here, but i've been stuck to long with this and i wanna continue
+    // even though i don't fully understand what's going on (yet).
+    let div_test_lcm = input.iter()
+        .map(|monkey| monkey.divisible_test)
+        .reduce(num::integer::lcm)
+        .unwrap();
+    top_most_active_monkeys(input, 10000, |worry| worry % div_test_lcm)
 }
 
 
@@ -231,8 +252,11 @@ static INPUT: &str = include_str!("inputs/day11.txt");
 
 pub fn run() {
     let monkey_defs = parse_input(INPUT);
-    let part1 = top_most_active_monkeys(&monkey_defs, 20, true);
+    let part1 = calc_part_one(&monkey_defs);
     println!("Items handled by top two active monkeys, multiplied together: {part1}");
+
+    let part2 = calc_part_two(&monkey_defs);
+    println!("Same, but without relief: {part2}");
 }
 
 
@@ -292,10 +316,10 @@ mod test {
                          If true: throw to monkey 0
                          If false: throw to monkey 1";
         let parsed = parse_input(input);
-        let part1 = top_most_active_monkeys(&parsed, 20, true);
+        let part1 = calc_part_one(&parsed);
         assert_eq!(part1, 10605);
 
-        //let part2 = top_most_active_monkeys(&parsed, 10000, false);
-        //assert_eq!(part2, 2713310158);
+        let part2 = calc_part_two(&parsed);
+        assert_eq!(part2, 2713310158);
     }
 }
