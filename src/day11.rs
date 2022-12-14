@@ -171,6 +171,7 @@ fn parse_input(input: &str) -> Vec<MonkeyDef> {
 }
 
 
+#[derive(Debug, Clone)]
 struct Monkey<'a> {
     def: &'a MonkeyDef,
     items: Vec<WorryLevel>,
@@ -188,42 +189,45 @@ impl<'a> Monkey<'a> {
 }
 
 
-fn simulate_monkeys<F>(monkeys: &mut [Monkey<'_>], rounds: usize, mut relief_function: F)
+/// Simulates a single round of monkey shenanigans.
+fn step_monkeys<F>(monkeys: &mut [Monkey<'_>], relief_function: &mut F)
 where
     F: FnMut(WorryLevel) -> WorryLevel,
 {
-    for _round in 0..rounds {
-        for current_idx in 0..monkeys.len() {
-            // borrow all thre monkeys involved
-            let true_idx = monkeys[current_idx].def.true_monkey;
-            let false_idx = monkeys[current_idx].def.false_monkey;
-            let [current_monkey, true_monkey, false_monkey] = monkeys
-                .get_muts([current_idx, true_idx, false_idx]);
+    for current_idx in 0..monkeys.len() {
+        // borrow all thre monkeys involved
+        let true_idx = monkeys[current_idx].def.true_monkey;
+        let false_idx = monkeys[current_idx].def.false_monkey;
+        let [current_monkey, true_monkey, false_monkey] = monkeys
+            .get_muts([current_idx, true_idx, false_idx]);
 
-            // a monkey always inspects all it's items
-            current_monkey.inspected_item_count += current_monkey.items.len();
+        // a monkey always inspects all it's items
+        current_monkey.inspected_item_count += current_monkey.items.len();
 
-            for item in current_monkey.items.drain(..) {
-                let inspected_item = current_monkey.def.operation.evaluate(item);
-                let tested_item = relief_function(inspected_item);
+        for item in current_monkey.items.drain(..) {
+            let inspected_item = current_monkey.def.operation.evaluate(item);
+            let tested_item = relief_function(inspected_item);
 
-                if tested_item % current_monkey.def.divisible_test == 0 {
-                    true_monkey.items.push(tested_item);
-                } else {
-                    false_monkey.items.push(tested_item);
-                }
+            if tested_item % current_monkey.def.divisible_test == 0 {
+                true_monkey.items.push(tested_item);
+            } else {
+                false_monkey.items.push(tested_item);
             }
         }
     }
 }
 
 
-fn top_most_active_monkeys<F>(input: &[MonkeyDef], rounds: usize, relief_function: F) -> usize
+fn top_most_active_monkeys<F>(input: &[MonkeyDef], rounds: usize, mut relief_function: F) -> usize
 where
     F: FnMut(WorryLevel) -> WorryLevel,
 {
     let mut monkeys = input.iter().map(Monkey::new).collect::<Vec<_>>();
-    simulate_monkeys(&mut monkeys, rounds, relief_function);
+
+    for _ in 0..rounds {
+        step_monkeys(&mut monkeys, &mut relief_function);
+    }
+
     monkeys.sort_unstable_by_key(|m| m.inspected_item_count);
     monkeys.iter().rev().take(2).map(|m| m.inspected_item_count).product()
 }
@@ -321,5 +325,75 @@ mod test {
 
         let part2 = calc_part_two(&parsed);
         assert_eq!(part2, 2713310158);
+    }
+
+
+    /// Checks that two relief functions, f1 and f2, lead to the same monkey business within the
+    /// given number of rounds.
+    fn check_relief_equivalence<F1, F2>(input: &[MonkeyDef], max_rounds: usize, mut f1: F1,
+        mut f2: F2) -> bool
+    where
+        F1: FnMut(WorryLevel) -> WorryLevel,
+        F2: FnMut(WorryLevel) -> WorryLevel,
+    {
+        let mut monkeys_1 = input.iter().map(Monkey::new).collect::<Vec<_>>();
+        let mut monkeys_2 = monkeys_1.clone();
+
+        for _ in 0..max_rounds {
+            step_monkeys(&mut monkeys_1, &mut f1);
+            step_monkeys(&mut monkeys_2, &mut f2);
+
+            let equivalent = monkeys_1.iter()
+                .zip(monkeys_2.iter())
+                .all(|(m1, m2)| m1.inspected_item_count == m2.inspected_item_count);
+            if !equivalent {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    #[test]
+    fn relief_equivalence() {
+        let input = "Monkey 0:
+                       Starting items: 79, 98
+                       Operation: new = old * 19
+                       Test: divisible by 24
+                         If true: throw to monkey 2
+                         If false: throw to monkey 3
+
+                     Monkey 1:
+                       Starting items: 54, 65, 75, 74
+                       Operation: new = old + 6
+                       Test: divisible by 18
+                         If true: throw to monkey 2
+                         If false: throw to monkey 0
+
+                     Monkey 2:
+                       Starting items: 79, 60, 97
+                       Operation: new = old * old
+                       Test: divisible by 14
+                         If true: throw to monkey 1
+                         If false: throw to monkey 3
+
+                     Monkey 3:
+                       Starting items: 74
+                       Operation: new = old + 3
+                       Test: divisible by 18
+                         If true: throw to monkey 0
+                         If false: throw to monkey 1";
+        let parsed = parse_input(input);
+
+        // this check is very sensitive to larger round counts. it can overflow even with moderate
+        // counts.
+        let lcm = parsed.iter()
+            .map(|monkey| monkey.divisible_test)
+            .reduce(num::integer::lcm)
+            .unwrap();
+        let f1 = |w| w;
+        let f2 = |w| w % lcm;
+        let equiv = check_relief_equivalence(&parsed, 6, f1, f2);
+        assert!(equiv);
     }
 }
