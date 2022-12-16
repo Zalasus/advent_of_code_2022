@@ -47,26 +47,19 @@ impl<const N: usize> Rope<N> {
     }
 
     fn step_map(tail_delta: Vector) -> Option<Vector> {
-        static STEP_MAP_X: [[i32; 5]; 5] = [
+        // this is the map for X. for Y, it's just transposed.
+        static STEP_MAP: [[i32; 5]; 5] = [
             [-1, -1, 0, 1, 1],
             [-1,  0, 0, 0, 1],
             [-1,  0, 0, 0, 1],
             [-1,  0, 0, 0, 1],
             [-1, -1, 0, 1, 1],
-        ];
-
-        static STEP_MAP_Y: [[i32; 5]; 5] = [
-            [-1, -1, -1, -1, -1],
-            [-1,  0,  0,  0, -1],
-            [ 0,  0,  0,  0,  0],
-            [ 1,  0,  0,  0,  1],
-            [ 1,  1,  1,  1,  1],
         ];
 
         let offset = (tail_delta + Vector::new(2, 2)).cast::<usize>().unwrap();
 
-        let x = STEP_MAP_X.get(offset.y)?.get(offset.x)?;
-        let y = STEP_MAP_Y.get(offset.y)?.get(offset.x)?;
+        let x = STEP_MAP.get(offset.y)?.get(offset.x)?;
+        let y = STEP_MAP.get(offset.x)?.get(offset.y)?;
 
         Some(Vector::new(*x, *y))
     }
