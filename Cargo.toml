@@ -14,3 +14,6 @@ petgraph = "0.6"
 ndarray = "0.15"
 cgmath = "0.18"
 num = "0.4"
+
+[dev-dependencies]
+assert2 = "0.3"
