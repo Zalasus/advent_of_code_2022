@@ -14,6 +14,7 @@ pub mod day11;
 pub mod day12;
 pub mod day13;
 pub mod day14;
+pub mod day15;
 
 
 use clap::Parser;
@@ -72,6 +73,7 @@ impl Aoc {
         aoc.add_day(12, day12::run)?;
         aoc.add_day(13, day13::run)?;
         aoc.add_day(14, day14::run)?;
+        aoc.add_day(15, day15::run)?;
         Ok(aoc)
     }
 
