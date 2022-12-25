@@ -1,9 +1,4 @@
 
-use itertools::Itertools;
-
-use std::collections::HashSet;
-
-
 type Coord = i64;
 type Point = cgmath::Vector2<Coord>;
 
@@ -31,9 +26,48 @@ fn manhattan_distance(a: Point, b: Point) -> Coord {
     arr.iter().map(|c| c.abs()).sum()
 }
 
+
+#[derive(Copy, Clone)]
+struct CoordRange {
+    start: Coord,
+    end: Coord,
+}
+
+impl CoordRange {
+    fn new(start: Coord, end: Coord) -> Self {
+        Self {
+            start,
+            end,
+        }
+    }
+
+    fn overlaps(&self, other: &Self) -> bool {
+        let self_range = self.start..=self.end;
+        let other_range = other.start..=other.end;
+        other_range.contains(&self.start) || other_range.contains(&self.end)
+            || self_range.contains(&other.start)
+    }
+
+    fn try_join(&self, other: &Self) -> Option<Self> {
+        if self.overlaps(other) {
+            Some(Self {
+                start: self.start.min(other.start),
+                end: self.end.max(other.end),
+            })
+        } else {
+            None
+        }
+    }
+
+    fn len(&self) -> Coord {
+        (self.end - self.start).abs()
+    }
+}
+
+
 struct Sensor {
     position: Point,
-    beacon: Point,
+    _beacon: Point,
     range: Coord,
 }
 
@@ -46,22 +80,15 @@ impl Sensor {
         let beacon = point_from_coords(beacon_coords);
         Self {
             position: sensor,
-            beacon,
+            _beacon: beacon,
             range: manhattan_distance(sensor, beacon),
         }
-    }
-
-    fn is_in_range(&self, p: Point) -> bool {
-        manhattan_distance(self.position, p) <= self.range
     }
 }
 
 
 struct Map {
     sensors: Vec<Sensor>,
-    beacons: HashSet<Point>,
-    x_min: Coord,
-    x_max: Coord,
 }
 
 impl Map {
@@ -70,60 +97,97 @@ impl Map {
             .map(|line| Sensor::parse(line))
             .collect::<Vec<_>>();
 
-        let beacons = sensors.iter()
-            .map(|sensor| sensor.beacon)
-            .collect::<HashSet<_>>();
-
-        let (x_min, x_max) = sensors.iter()
-            .map(|sensor| {
-                let x = sensor.position.x;
-                let range = sensor.range;
-                [x - range, x + range].into_iter()
-            })
-            .flatten()
-            .minmax()
-            .into_option()
-            .unwrap();
-
         Self {
             sensors,
-            beacons,
-            x_min,
-            x_max,
+        }
+    }
+}
+
+
+struct BeaconFinder<'a> {
+    map: &'a Map,
+    ranges: Vec<CoordRange>,
+    joint_ranges: Vec<CoordRange>,
+}
+
+impl<'a> BeaconFinder<'a> {
+    fn new(map: &'a Map) -> Self {
+        Self {
+            map,
+            ranges: Vec::with_capacity(map.sensors.len()),
+            joint_ranges: Vec::with_capacity(map.sensors.len()),
         }
     }
 
-    fn count_nobeacon_cells(&self, y: Coord) -> usize {
-        let mut ranges = self.sensors.iter()
+    /// Collects the ranges of x coordinates that are covered by the sensors and joins overlapping
+    /// ranges.
+    fn collect_ranges(&mut self, y: Coord) {
+        self.ranges.clear();
+        self.joint_ranges.clear();
+
+        // this utilized the rectangular shape of the L1 norm:
+        self.ranges.extend(self.map.sensors.iter()
             .filter_map(|s| {
-                let y_diff = s.position.y.abs_diff(y);
+                let y_diff = (s.position.y - y).abs();
                 if y_diff <= s.range {
                     let start = s.position.x - s.range + y_diff;
                     let end = s.position.x + s.range - y_diff;
-                    Some(start..=end)
+                    Some(CoordRange::new(start, end))
                 } else {
                     None
                 }
-            })
-            .collect::<Vec<_>>();
+            }));
 
-        ranges.sort_unstable_by_key(|r| r.0);
+        self.ranges.sort_unstable_by_key(|r| r.start);
 
-        let mut joint_ranges = Vec::new();
-        for window in ranges.windows(2) {
-            if window[1].contains(window[0].end) {
-                joint_ranges.push(window[0].start..window[1].end)
+        if let Some(current) = self.ranges.first() {
+            let mut current = *current;
+            for range in self.ranges.iter().skip(1) {
+                if let Some(joint) = current.try_join(range) {
+                    current = joint;
+                } else {
+                    self.joint_ranges.push(current);
+                    current = *range;
+                }
+            }
+            self.joint_ranges.push(current);
+        }
+    }
+
+    fn count_nobeacon_cells(&mut self, y: Coord) -> usize {
+        self.collect_ranges(y);
+        self.joint_ranges.iter()
+            .map(|range| range.len())
+            .sum::<Coord>()
+            .try_into()
+            .unwrap()
+    }
+
+    fn find_beacon(&mut self, max: Coord) -> Point {
+        // do the same as in part 1, but this time, look for a hole in the range of coordinates.
+        //  corner cutting: this will not check whether the hole is unique.
+        //  searching only the borders of sensors is probably more efficient than this, but meh.
+        for y in 0..max {
+            self.collect_ranges(y);
+
+            // edge case: only one range with the hole right at the x border
+            if self.joint_ranges.len() == 1 {
+                let range = self.joint_ranges[0];
+                if range.start == 1 {
+                    return Point::new(0, y);
+                } else if range.end == (max - 1) {
+                    return Point::new(max, y);
+                }
+            }
+
+            for window in self.joint_ranges.windows(2) {
+                if window[0].end >= 0 && window[1].start <= max {
+                    return Point::new(window[0].end + 1, y);
+                }
             }
         }
-        ranges.windows(2)
-            .map(|w| if w
 
-        /*(self.x_min..=self.x_max).into_iter()
-            .map(|x| Point::new(x, y))
-            .filter(|p| !self.beacons.contains(p))
-            .filter(|p| self.sensors.iter().any(|s| s.is_in_range(*p)))
-            .count()
-        */
+        panic!("No hole found");
     }
 }
 
@@ -132,9 +196,15 @@ static INPUT: &str = include_str!("inputs/day15.txt");
 
 pub fn run() {
     let map = Map::parse(INPUT);
+    let mut finder = BeaconFinder::new(&map);
     let row = 2000000;
-    let part1 = map.count_nobeacon_cells(row);
+    let part1 = finder.count_nobeacon_cells(row);
     println!("Positions at which no beacon can be present in row {row}: {part1}");
+
+    let max = 4000000;
+    let beacon = finder.find_beacon(max);
+    let part2 = beacon.x * max + beacon.y;
+    println!("Beacon at {beacon:?}. Frequency: {part2}");
 }
 
 
@@ -161,9 +231,9 @@ mod test {
         let map = Map::parse(input);
         assert_eq!(map.sensors.len(), 14);
         assert_eq!(map.sensors[3].position, Point::new(12, 14));
-        assert_eq!(map.sensors[3].beacon, Point::new(10, 16));
-        assert_eq!(map.beacons.len(), 6);
 
-        assert_eq!(map.count_nobeacon_cells(10), 26);
+        let mut finder = BeaconFinder::new(&map);
+        assert_eq!(finder.count_nobeacon_cells(10), 26);
+        assert_eq!(finder.find_beacon(20), Point::new(14, 11));
     }
 }
